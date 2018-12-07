@@ -29,6 +29,8 @@ namespace Gauss {
         //Methods
         template<typename World>
         void step(World &world) { m_impl.step(world, m_dt, m_t); m_t += m_dt; }
+        template<typename World>
+        void step(World &world, float dt) { m_impl.step(world, dt, m_t); m_t += dt; }
         inline DataType getTime() const { return m_t; }
         inline void setDt(DataType dt) { m_dt = dt; }
         inline auto & getLagrangeMultipliers() { return m_impl.getLagrangeMultipliers(); }
