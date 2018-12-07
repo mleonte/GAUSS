@@ -24,8 +24,8 @@ typedef PhysicalSystemFEM<double, NeohookeanTet> FEMLinearTets;
 typedef World<double, std::tuple<FEMLinearTets *,PhysicalSystemParticleSingle<double> *>,
 std::tuple<ForceSpringFEMParticle<double> *, ForceParticlesGravity<double> *>,
 std::tuple<ConstraintFixedPoint<double> *> > MyWorld;
-typedef TimeStepperEulerImplicitBFGS<double, AssemblerEigenSparseMatrix<double>,
-AssemblerEigenVector<double> > MyTimeStepper;
+typedef TimeStepperEulerImplicitBFGS<double, AssemblerParallel<double, AssemblerEigenSparseMatrix<double>>,
+	AssemblerParallel<double, AssemblerEigenVector<double>> > MyTimeStepper;
 
 typedef Scene<MyWorld, MyTimeStepper> MyScene;
 

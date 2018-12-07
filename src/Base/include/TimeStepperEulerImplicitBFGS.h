@@ -13,7 +13,6 @@
 #include <World.h>
 #include <Assembler.h>
 #include <TimeStepper.h>
-#include <Eigen/Dense>
 
 #include <Eigen/Sparse>
 #include <UtilitiesEigen.h>
@@ -53,6 +52,7 @@ namespace Gauss {
     protected:
         
         MatrixAssembler m_massMatrix;
+		MatrixAssembler m_stiffnessMatrix;
         VectorAssembler m_forceVector;
         Eigen::SparseMatrix<DataType> m_P;
         
@@ -68,6 +68,7 @@ void TimeStepperImplEulerImplicitBFGS<DataType, MatrixAssembler, VectorAssembler
     
     //First two lines work around the fact that C++11 lambda can't directly capture a member variable.
     MatrixAssembler &massMatrix = m_massMatrix;
+	MatrixAssembler &stiffnessMatrix = m_stiffnessMatrix;
     VectorAssembler &forceVector = m_forceVector;
     Eigen::SparseMatrix<DataType> &P = m_P;
     
@@ -80,6 +81,11 @@ void TimeStepperImplEulerImplicitBFGS<DataType, MatrixAssembler, VectorAssembler
     ASSEMBLEMATINIT(massMatrix, world.getNumQDotDOFs(), world.getNumQDotDOFs());
     ASSEMBLELIST(massMatrix, world.getSystemList(), getMassMatrix);
     ASSEMBLEEND(massMatrix);
+
+	///get stiffness matrix
+	ASSEMBLEMATINIT(stiffnessMatrix, world.getNumQDotDOFs(), world.getNumQDotDOFs());
+	ASSEMBLELIST(stiffnessMatrix, world.getSystemList(), getStiffnessMatrix);
+	ASSEMBLEEND(stiffnessMatrix);
     
     //std::cout<<"F: "<<(*forceVector)<<"\n";
     //setup RHS
@@ -91,10 +97,10 @@ void TimeStepperImplEulerImplicitBFGS<DataType, MatrixAssembler, VectorAssembler
     
     //std::cout<<"F: \n"<<(*forceVector)<<"\n";
     
-    
-    //Eigen::SparseMatrix<DataType, Eigen::RowMajor> systemMatrix = (*m_massMatrix)- dt*dt*(*m_stiffnessMatrix);
+    Eigen::SparseMatrix<DataType, Eigen::RowMajor> systemMatrix = P * ((*m_massMatrix)- dt*dt*(*m_stiffnessMatrix)) * P.transpose();
     
     //we're going to build equality constraints into our gradient and hessian calcuations
+	// x => current guess
     auto objective = [&world, &q, &qDot, &dt, &forceVector, &massMatrix, &P](Eigen::VectorXd &x, Eigen::VectorXd &grad) -> double {
     
         //std::cout<<"X\n"<<x<<"\n\n";
@@ -126,7 +132,7 @@ void TimeStepperImplEulerImplicitBFGS<DataType, MatrixAssembler, VectorAssembler
     param.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_WOLFE;
     
     // Create solver and function object
-    LBFGSpp::LBFGSSolver<DataType> m_solver(param);
+    LBFGSpp::LBFGSSolver<DataType> m_solver(param, systemMatrix);
     
     double fx = 0.0;
     Eigen::VectorXd qNew = P*qDot;

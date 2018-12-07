@@ -9,6 +9,10 @@
 #include "LBFGS/LineSearch.h"
 #include <SolverPardiso.h>
 
+#include <Eigen/Sparse>
+#include <UtilitiesEigen.h>
+#include <Assembler.h>
+
 namespace LBFGSpp {
 
 
@@ -21,6 +25,7 @@ class LBFGSSolver
 private:
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+	typedef Eigen::SparseMatrix<Scalar> SparseMatrix;
     typedef Eigen::Map<Vector> MapVec;
 
     const LBFGSParam<Scalar>& m_param;  // Parameters to control the LBFGS algorithm
@@ -33,6 +38,8 @@ private:
     Vector                    m_grad;   // New gradient
     Vector                    m_gradp;  // Old gradient
     Vector                    m_drt;    // Moving direction
+	// added for QN method:
+	SparseMatrix              m_systemMatrix;
 
     inline void reset(int n)
     {
@@ -56,10 +63,11 @@ public:
     /// \param param An object of \ref LBFGSParam to store parameters for the
     ///        algorithm
     ///
-    LBFGSSolver(const LBFGSParam<Scalar>& param) :
+    LBFGSSolver(const LBFGSParam<Scalar>& param, SparseMatrix systemMatrix) :
         m_param(param)
     {
         m_param.check_param();
+		m_systemMatrix = systemMatrix;
     }
 
     ///
@@ -99,6 +107,10 @@ public:
         m_drt.noalias() = -m_grad;
         // Initial step
         Scalar step = Scalar(1.0) / m_drt.norm();
+		
+		// added for QN method:
+		Eigen::SimplicialLDLT<Eigen::SparseMatrix<Scalar>> systemMatrixSolver;
+		systemMatrixSolver.compute(m_systemMatrix);
 
         int k = 1;
         int end = 0;
@@ -162,8 +174,13 @@ public:
                 m_drt.noalias() -= m_alpha[j] * yj;
             }
 
+			
+			// added for QN method:
+			auto mat = systemMatrixSolver.solve(m_drt);
+			m_drt = mat;
+
             //I think you are hitting H0 here so here we'd apply a prefactored hessian
-            m_drt *= (ys / yy);
+            //m_drt *= (ys / yy);
 
             for(int i = 0; i < bound; i++)
             {
